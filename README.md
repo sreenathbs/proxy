@@ -219,3 +219,118 @@ firebase-proxy/
 - **Header Injection** - Add authentication headers server-side
 - **Domain Restriction** - Limit proxy usage to specific APIs
 - **Request Logging** - Monitor API usage (via Firebase logs)
+
+## CI/CD Deployment with GitHub Actions
+
+### Step 1: Create Firebase Service Account
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Select your project
+3. Go to **Project Settings** → **Service Accounts**
+4. Click **Generate New Private Key**
+5. Download the JSON file
+6. Copy the entire JSON content
+
+### Step 2: Setup GitHub Secrets
+1. Go to your GitHub repository
+2. **Settings** → **Secrets and Variables** → **Actions**
+3. Click **New Repository Secret**
+4. Add these secrets:
+
+```
+FIREBASE_SERVICE_ACCOUNT
+# Paste the entire JSON content from step 2
+
+FIREBASE_PROJECT_ID
+# Your Firebase project ID (e.g., my-proxy-project)
+
+PROXY_API_KEY
+# Your proxy API key (e.g., super-secret-key-123)
+
+PROXY_DOMAINS
+# Comma-separated domains (e.g., api.example.com)
+```
+
+### Step 3: Create GitHub Actions Workflow
+Create `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy to Firebase
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    container: node:18-alpine
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install system dependencies
+      run: apk add --no-cache git curl jq bash
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Create Firebase service account file
+      run: |
+        echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > firebase-service-account.json
+
+    - name: Install Firebase CLI
+      run: npm install -g firebase-tools
+
+    - name: Set Firebase configuration
+      run: |
+        firebase functions:config:set \
+          proxy.apikey="${{ secrets.PROXY_API_KEY }}" \
+          proxy.domains="${{ secrets.PROXY_DOMAINS }}" \
+          --project ${{ secrets.FIREBASE_PROJECT_ID }}
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: firebase-service-account.json
+
+    - name: Deploy to Firebase
+      run: |
+        firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID }}
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: firebase-service-account.json
+
+    - name: Cleanup
+      run: rm -f firebase-service-account.json
+```
+
+### Step 4: Auto-Deploy Setup
+1. **Push to main branch** triggers automatic deployment
+2. **Pull requests** run tests (optional)
+3. **Configuration** is set automatically from GitHub secrets
+4. **Deployment** happens without manual intervention
+
+### Step 6: Verify Deployment
+```bash
+# Check GitHub Actions tab in your repository
+# Verify deployment logs
+# Test the deployed function URL
+
+curl -X POST "https://us-central1-PROJECT-ID.cloudfunctions.net/proxy" \
+  -H "x-api-key: YOUR-API-KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://httpbin.org/get"}'
+```
+
+### Environment Management
+For multiple environments (dev/staging/prod):
+
+```yaml
+# Add to workflow for environment-specific deployment
+- name: Deploy to staging
+  if: github.ref == 'refs/heads/develop'
+  run: firebase deploy --project ${{ secrets.FIREBASE_PROJECT_ID_STAGING }}
+
+- name: Deploy to production
+  if: github.ref == 'refs/heads/main'
+  run: firebase deploy --project ${{ secrets.FIREBASE_PROJECT_ID_PROD }}
+```

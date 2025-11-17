@@ -1,0 +1,47 @@
+name: Deploy to Firebase
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '22'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Create Firebase service account file
+      run: |
+        echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > firebase-service-account.json
+
+    - name: Install Firebase CLI
+      run: npm install -g firebase-tools
+
+    - name: Set Firebase configurations
+      run: |
+        firebase functions:config:set \
+          proxy.apikey="${{ secrets.PROXY_API_KEY }}" \
+          proxy.domains="${{ secrets.PROXY_DOMAINS }}" \
+          --project ${{ secrets.FIREBASE_PROJECT_ID }}
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: firebase-service-account.json
+
+    - name: Deploy to Firebase
+      run: |
+        firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID }} --force
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: firebase-service-account.json
+
+    - name: Cleanup
+      run: rm -f firebase-service-account.json

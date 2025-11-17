@@ -7,9 +7,13 @@
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },
+  "engines": {
+    "node": "20"
+  },
   "dependencies": {
-    "firebase-functions": "^4.0.0",
     "cors": "^2.8.5",
+    "firebase-functions": "^4.0.0",
+    "firebase-tools": "^14.25.0",
     "node-fetch": "^2.6.7"
   }
 }
